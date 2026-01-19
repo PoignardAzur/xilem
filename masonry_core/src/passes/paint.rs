@@ -71,7 +71,7 @@ fn paint_widget(
     state.request_post_paint = false;
     state.needs_paint = false;
 
-    let has_clip = state.clip_path.is_some();
+    let clips_contents = state.clips_contents;
     if !is_stashed {
         let transform = state.window_transform;
         let Some((scene, _)) = &mut scene_cache.get(&id) else {
@@ -81,8 +81,12 @@ fn paint_widget(
             return;
         };
 
-        if let Some(clip) = state.clip_path {
-            complete_scene.push_clip_layer(transform, &clip);
+        if clips_contents {
+            if let Some(clip) = &state.clip_shape {
+                complete_scene.push_clip_layer(transform, clip);
+            } else {
+                complete_scene.push_clip_layer(transform, &state.size().to_rect());
+            }
         }
 
         complete_scene.append(scene, Some(transform));
@@ -117,7 +121,7 @@ fn paint_widget(
             stroke(complete_scene, &rect, color, BORDER_WIDTH);
         }
 
-        if has_clip {
+        if clips_contents {
             complete_scene.pop_layer();
         }
 

@@ -12,7 +12,7 @@ use dpi::{LogicalPosition, PhysicalPosition};
 use parley::{FontContext, LayoutContext};
 use tracing::{trace, warn};
 use tree_arena::{ArenaMut, ArenaMutList, ArenaRefList};
-use vello::kurbo::{Affine, Axis, Insets, Point, Rect, Size, Vec2};
+use vello::kurbo::{Affine, Axis, BezPath, Insets, Point, Rect, Shape, Size, Vec2};
 
 use crate::app::{MutateCallback, RenderRootSignal, RenderRootState};
 use crate::core::{
@@ -934,35 +934,49 @@ impl LayoutCtx<'_> {
         self.get_child_state(child).layout_size
     }
 
-    /// Gives the widget a clip path.
+    /// Sets whether the [clip shape] is applied to the widget and its children.
     ///
-    /// A widget's clip path will have two effects:
-    /// - It serves as a mask for painting operations of the widget's children (*not* the widget itself).
-    /// - Pointer events must be inside that path to reach the widget's children.
-    pub fn set_clip_path(&mut self, path: Rect) {
-        // We intentionally always log this because clip paths are:
-        // 1) Relatively rare in the tree
-        // 2) An easy potential source of items not being visible when expected
-        trace!("set_clip_path {path:?}");
-        self.widget_state.clip_path = Some(path);
-        // TODO - Updating the clip path may have
-        // other knock-on effects we'd need to document.
+    /// [clip shape]: crate::doc::masonry_concepts#clip-shape.
+    pub fn set_clips_contents(&mut self, clips: bool) {
+        self.widget_state.clips_contents = clips;
+
         self.widget_state.request_accessibility = true;
         self.widget_state.needs_accessibility = true;
         self.widget_state.needs_paint = true;
+        self.global_state.needs_pointer_pass = true;
     }
 
-    /// Removes the widget's clip path.
+    /// Gives the widget a [clip shape].
     ///
-    /// See [`LayoutCtx::set_clip_path`] for details.
-    pub fn clear_clip_path(&mut self) {
-        trace!("clear_clip_path");
-        self.widget_state.clip_path = None;
-        // TODO - Updating the clip path may have
+    /// A widget's clip shape will have two effects:
+    /// - If the widget [clips its contents], it serves as a mask for painting operations of the widget and it children.
+    /// - Pointer events must be inside that path to reach the widget.
+    ///
+    /// [clip shape]: crate::doc::masonry_concepts#clip-shape.
+    /// [clips its contents]: Self::set_clips_contents
+    pub fn set_clip_shape(&mut self, shape: impl Shape) {
+        let path = shape.to_path(0.1);
+        // We intentionally always log this because clip shapes are:
+        // 1) Relatively rare in the tree
+        // 2) An easy potential source of items not being visible when expected
+        trace!("set_clip_shape {path:?}");
+        self.widget_state.clip_shape = Some(path);
+        // TODO - Updating the clip shape may have
         // other knock-on effects we'd need to document.
-        self.widget_state.request_accessibility = true;
-        self.widget_state.needs_accessibility = true;
         self.widget_state.needs_paint = true;
+        self.global_state.needs_pointer_pass = true;
+    }
+
+    /// Removes the widget's [clip shape].
+    ///
+    /// [clip shape]: crate::doc::masonry_concepts#clip-shape.
+    pub fn clear_clip_shape(&mut self) {
+        trace!("clear_clip_shape");
+        self.widget_state.clip_shape = None;
+        // TODO - Updating the clip shape may have
+        // other knock-on effects we'd need to document.
+        self.widget_state.needs_paint = true;
+        self.global_state.needs_pointer_pass = true;
     }
 }
 
@@ -1102,12 +1116,20 @@ impl_context_method!(
             self.widget_state.paint_rect()
         }
 
-        /// The clip path of the widget, if any was set.
+        /// The clip shape of the widget, if any was set.
         ///
         /// For more information, see
-        /// [`LayoutCtx::set_clip_path`](crate::core::LayoutCtx::set_clip_path).
-        pub fn clip_path(&self) -> Option<Rect> {
-            self.widget_state.clip_path
+        /// [`LayoutCtx::set_clip_shape`](crate::core::LayoutCtx::set_clip_shape).
+        pub fn clip_shape(&self) -> Option<&BezPath> {
+            self.widget_state.clip_shape.as_ref()
+        }
+
+        /// Whether the children clips its own contents and that of its children.
+        ///
+        /// For more information, see
+        /// [`LayoutCtx::set_clips_contents`](crate::core::LayoutCtx::set_clips_contents).
+        pub fn clips_contents(&self) -> bool {
+            self.widget_state.clips_contents
         }
 
         /// Converts a point from the widget's coordinate space to the window's.

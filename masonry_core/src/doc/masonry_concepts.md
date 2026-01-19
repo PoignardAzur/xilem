@@ -175,6 +175,20 @@ Previous versions of Masonry had a concept of a widget's "layout rect", composed
 However, given that widgets can have arbitrary transforms, the concept of an axis-aligned layout rect doesn't really make sense anymore.
 
 
+## Clip shape
+
+Widgets have a shape, usually one that matches their visual appearance, which has two purposes:
+
+- Pointer events outside of that shape will not affect the pointer.
+- If the widget is set to clip its contents, pointer events outside the clip shape won't affect the children either.
+- If the widget is set to clip its contents, its scene and the children's scenes will be painted inside of the clip shape.
+
+By default, the clip shape is the layout rect.
+You can use [`LayoutCtx::set_clip_shape`] to pass a custom clip shape.
+
+<!-- TODO: Rename to "widget shape" instead? -->
+<!-- Need a better name. -->
+
 ## Layers
 
 A Masonry application is composed of layers.
@@ -229,5 +243,6 @@ DPI-aware pixel snapping is a future feature.
 [`FocusChanged`]: crate::core::Update::FocusChanged
 [`Widget::accepts_focus`]: crate::core::Widget::accepts_focus
 [`EventCtx::request_focus`]: crate::core::EventCtx::request_focus
+[`LayoutCtx::set_clip_shape`]: crate::core::LayoutCtx::set_clip_shape
 [`Widget::on_pointer_event`]: crate::core::Widget::on_pointer_event
 [`RenderRoot`]: crate::app::RenderRoot

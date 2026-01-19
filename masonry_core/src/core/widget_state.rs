@@ -4,7 +4,7 @@
 use std::any::TypeId;
 
 use tracing::Span;
-use vello::kurbo::{Affine, Insets, Point, Rect, Size, Vec2};
+use vello::kurbo::{Affine, BezPath, Insets, Point, Rect, Shape, Size, Vec2};
 
 use crate::core::{WidgetId, WidgetOptions};
 use crate::layout::MeasurementCache;
@@ -114,10 +114,13 @@ pub(crate) struct WidgetState {
     /// an IME, in local coordinates.
     pub(crate) ime_area: Option<Rect>,
 
-    // TODO - Use general Shape
+    // TODO - Use more efficient type and avoid allocating by default.
     // Currently Kurbo doesn't really provide a type that lets us
     // efficiently hold an arbitrary shape.
-    pub(crate) clip_path: Option<Rect>,
+    /// Shape that restricts pointer events.
+    pub(crate) clip_shape: Option<BezPath>,
+    /// Whether the widget and its children's scenes are clipped by `clip_path`.
+    pub(crate) clips_contents: bool,
 
     /// Local transform of this widget in the parent coordinate space.
     pub(crate) transform: Affine,
@@ -241,7 +244,8 @@ impl WidgetState {
             accepts_focus: false,
             accepts_text_input: false,
             ime_area: None,
-            clip_path: Option::default(),
+            clip_shape: None,
+            clips_contents: false,
             scroll_translation: Vec2::ZERO,
             transform_changed: false,
             action_type,
@@ -371,21 +375,30 @@ impl WidgetState {
         self.window_transform.translation().to_point()
     }
 
-    /// Returns the result of intersecting the widget's clip path (if any) with the given rect.
+    /// Returns the portion of the given rect, if any, that is within the widget's "clip space".
+    ///
+    /// If the widget doesn't clip its children, returns the input rect.
+    /// If the clip path is a non-rectangle, uses the clip paths' bounding box.
+    /// If the given rect doesn't intersect with the clipping box, returns `None`.
     ///
     /// Both the argument and the result are in window coordinates.
-    ///
-    /// Returns `None` if the given rect is clipped out.
-    pub(crate) fn clip_child(&self, child_rect: Rect) -> Option<Rect> {
-        if let Some(clip_path) = self.clip_path {
-            let clip_path_global = self.window_transform.transform_rect_bbox(clip_path);
-            if clip_path_global.overlaps(child_rect) {
-                Some(clip_path_global.intersect(child_rect))
-            } else {
-                None
-            }
+    pub(crate) fn clipped_child_rect(&self, child_rect: Rect) -> Option<Rect> {
+        if !self.clips_contents {
+            return Some(child_rect);
+        }
+
+        let bounding_rect = if let Some(clip_shape) = &self.clip_shape {
+            clip_shape.bounding_box()
         } else {
-            Some(child_rect)
+            self.size().to_rect()
+        };
+
+        let bounding_rect_global = self.window_transform.transform_rect_bbox(bounding_rect);
+
+        if bounding_rect_global.overlaps(child_rect) {
+            Some(bounding_rect_global.intersect(child_rect))
+        } else {
+            None
         }
     }
 
