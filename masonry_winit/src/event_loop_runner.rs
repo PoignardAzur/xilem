@@ -51,6 +51,8 @@ pub enum MasonryUserEvent {
     ///
     /// Higher-level GUI frameworks may send these to winit from background threads so that they get reported as if they had come from inside a [`RenderRoot`].
     Action(WindowId, ErasedAction, WidgetId),
+    /// An action emitted outside the widget tree, intended for async message routing.
+    AsyncAction(WindowId, ErasedAction),
 }
 
 impl From<accesskit_winit::Event> for MasonryUserEvent {
@@ -961,24 +963,12 @@ impl MasonryState<'_> {
         event: MasonryUserEvent,
         app_driver: &mut dyn AppDriver,
     ) {
-        let state = match &event {
-            MasonryUserEvent::AccessKit(handle_id, ..) => {
-                let Some(state) = self.windows.get_mut(handle_id) else {
+        match event {
+            MasonryUserEvent::AccessKit(handle_id, event) => {
+                let Some(state) = self.windows.get_mut(&handle_id) else {
                     tracing::warn!(handle = ?handle_id, "Got accesskit user event for unknown window");
                     return;
                 };
-                state
-            }
-            MasonryUserEvent::Action(window_id, ..) => {
-                let Some(window_id) = self.window_id_to_handle_id.get(window_id) else {
-                    tracing::warn!(id = ?window_id, "Got action user event for unknown window");
-                    return;
-                };
-                self.windows.get_mut(window_id).unwrap()
-            }
-        };
-        match event {
-            MasonryUserEvent::AccessKit(_, event) => {
                 match event {
                     // Note that this event can be called at any time, even multiple times if
                     // the user restarts their screen reader.
@@ -998,9 +988,31 @@ impl MasonryState<'_> {
                 }
             }
             // TODO - Not sure what the use-case for this is.
-            MasonryUserEvent::Action(_, action, widget) => state
-                .render_root
-                .emit_signal(RenderRootSignal::Action(action, widget)),
+            MasonryUserEvent::Action(window_id, action, widget) => {
+                let Some(handle_id) = self.window_id_to_handle_id.get(&window_id).copied() else {
+                    tracing::warn!(id = ?window_id, "Got action user event for unknown window");
+                    return;
+                };
+                let state = self.windows.get_mut(&handle_id).unwrap();
+                state
+                    .render_root
+                    .emit_signal(RenderRootSignal::Action(action, widget));
+            }
+            MasonryUserEvent::AsyncAction(window_id, action) => {
+                let Some(handle_id) = self.window_id_to_handle_id.get(&window_id).copied() else {
+                    tracing::warn!(id = ?window_id, "Got async action user event for unknown window");
+                    return;
+                };
+                if !self.windows.contains_key(&handle_id) {
+                    tracing::warn!(id = ?window_id, "Got async action user event for unknown window");
+                    return;
+                }
+                app_driver.on_async_action(
+                    window_id,
+                    &mut DriverCtx::new(self, event_loop),
+                    action,
+                );
+            }
         }
 
         self.handle_signals(event_loop, app_driver);
