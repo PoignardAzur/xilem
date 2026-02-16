@@ -8,6 +8,7 @@
 //!
 //! - **[Masonry pass system](pass_system):** Deep dive into Masonry internals.
 //! - **[Concepts and definitions](masonry_concepts):** Glossary of concepts used in Masonry APIs and internals.
+//! - **[Focus design notes](focus_design_notes):** Current focus handling, known problems, and future directions.
 
 #[doc = include_str!("./pass_system.md")]
 /// <style> .rustdoc-hidden { display: none; } </style>
@@ -18,6 +19,10 @@ pub mod internals_01_pass_system {}
 /// <style> .rustdoc-hidden { display: none; } </style>
 pub mod internals_02_masonry_concepts {}
 
+#[doc = include_str!("./focus_design_notes.md")]
+/// <style> .rustdoc-hidden { display: none; } </style>
+pub mod internals_03_focus_design_notes {}
+
 // We add some aliases below so that the rest of the doc can link to these documents
 // without including the chapter number.
 
@@ -25,3 +30,5 @@ pub mod internals_02_masonry_concepts {}
 pub use self::internals_01_pass_system as pass_system;
 #[doc(hidden)]
 pub use self::internals_02_masonry_concepts as masonry_concepts;
+#[doc(hidden)]
+pub use self::internals_03_focus_design_notes as focus_design_notes;
