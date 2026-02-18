@@ -317,7 +317,7 @@ impl Widget for SizedBox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::Properties;
+    use crate::core::PropertySet;
     use crate::layout::{AsUnit, UnitPoint};
     use crate::palette;
     use crate::properties::types::Gradient;
@@ -330,7 +330,7 @@ mod tests {
 
     #[test]
     fn empty_box() {
-        let mut box_props = Properties::new();
+        let mut box_props = PropertySet::new();
         box_props.insert(BorderColor::new(palette::css::BLUE));
         box_props.insert(BorderWidth::all(5.0));
         box_props.insert(CornerRadius::all(5.0));
@@ -348,7 +348,7 @@ mod tests {
 
     #[test]
     fn label_box_no_size() {
-        let mut box_props = Properties::new();
+        let mut box_props = PropertySet::new();
         box_props.insert(BorderColor::new(palette::css::BLUE));
         box_props.insert(BorderWidth::all(5.0));
         box_props.insert(CornerRadius::all(5.0));
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn label_box_with_size() {
-        let mut box_props = Properties::new();
+        let mut box_props = PropertySet::new();
         box_props.insert(BorderColor::new(palette::css::BLUE));
         box_props.insert(BorderWidth::all(5.0));
         box_props.insert(CornerRadius::all(5.0));
@@ -381,7 +381,7 @@ mod tests {
 
     #[test]
     fn label_box_with_padding() {
-        let mut box_props = Properties::new();
+        let mut box_props = PropertySet::new();
         box_props.insert(BorderColor::new(palette::css::BLUE));
         box_props.insert(BorderWidth::all(5.0));
         box_props.insert(CornerRadius::all(5.0));
@@ -397,7 +397,7 @@ mod tests {
 
     #[test]
     fn label_box_with_solid_background() {
-        let mut box_props = Properties::new();
+        let mut box_props = PropertySet::new();
         box_props.insert(Background::Color(palette::css::PLUM));
 
         let widget = SizedBox::new(Label::new("hello").with_auto_id())
@@ -413,7 +413,7 @@ mod tests {
 
     #[test]
     fn empty_box_with_gradient_background() {
-        let mut box_props = Properties::new();
+        let mut box_props = PropertySet::new();
 
         let gradient = Gradient::new_linear(2.0).with_stops([
             palette::css::WHITE,
@@ -440,7 +440,7 @@ mod tests {
 
     #[test]
     fn radial_gradient_background() {
-        let mut box_props = Properties::new();
+        let mut box_props = PropertySet::new();
 
         let gradient = Gradient::new_radial(UnitPoint::CENTER).with_stops([
             palette::css::WHITE,
@@ -467,7 +467,7 @@ mod tests {
 
     #[test]
     fn sweep_gradient_background() {
-        let mut box_props = Properties::new();
+        let mut box_props = PropertySet::new();
 
         let gradient = Gradient::new_full_sweep(UnitPoint::CENTER, 0.).with_stops([
             palette::css::WHITE,
@@ -494,7 +494,7 @@ mod tests {
 
     #[test]
     fn label_box_with_padding_and_background() {
-        let mut box_props = Properties::new();
+        let mut box_props = PropertySet::new();
         box_props.insert(Background::Color(palette::css::PLUM));
         box_props.insert(BorderColor::new(palette::css::LIGHT_SKY_BLUE));
         box_props.insert(BorderWidth::all(5.0));
@@ -516,7 +516,7 @@ mod tests {
     #[test]
     fn invalid_screenshot() {
         // Copy-pasted from empty_box
-        let mut box_props = Properties::new();
+        let mut box_props = PropertySet::new();
         box_props.insert(BorderColor::new(palette::css::BLUE));
         box_props.insert(BorderWidth::all(5.0));
         box_props.insert(CornerRadius::all(5.0));
