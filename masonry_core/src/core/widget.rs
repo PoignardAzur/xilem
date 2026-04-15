@@ -20,6 +20,7 @@ use crate::core::{
 };
 use crate::imaging::Painter;
 use crate::layout::LenReq;
+use crate::properties::Visible;
 
 /// A unique identifier for a single [`Widget`].
 ///
@@ -599,6 +600,10 @@ pub fn find_widget_under_pointer<'c>(
         return None;
     }
     if ctx.is_stashed() {
+        return None;
+    }
+    let cache = ctx.property_cache();
+    if !ctx.properties().get_without_saving::<Visible>(cache).value {
         return None;
     }
 

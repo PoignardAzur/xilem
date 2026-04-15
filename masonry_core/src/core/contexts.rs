@@ -248,6 +248,11 @@ impl_context_method!(
 );
 
 impl QueryCtx<'_> {
+    /// Returns a reference to this widget's properties.
+    pub fn properties(&self) -> &PropertiesRef<'_> {
+        &self.properties
+    }
+
     /// Returns a reference to this widget's property cache.
     pub fn property_cache(&self) -> &PropertyCache {
         &self.widget_state.property_cache
