@@ -70,7 +70,7 @@ fn paint_widget(
     scene_cache: &mut HashMap<WidgetId, (Scene, Scene, Scene)>,
     window_to_layer_transform: &Affine,
     node: ArenaMut<'_, WidgetArenaNode>,
-    visible: bool,
+    is_visible: bool,
 ) {
     let mut children = node.children;
     let widget = &mut *node.item.widget;
@@ -78,7 +78,6 @@ fn paint_widget(
     let properties = &mut node.item.properties;
     let class_set = &node.item.class_set;
     let id = state.id;
-    let mut visible = visible;
 
     let trace = global_state.trace.paint;
     let _span = enter_span_if(trace, state);
@@ -88,10 +87,24 @@ fn paint_widget(
     // (See WidgetState doc.)
     let is_stashed = state.is_stashed;
 
+    let is_visible = is_visible & {
+        let stack = property_arena.get(state.property_stack_id, widget.type_id());
+        let props = PropertiesRef {
+            local: properties,
+            default_map: default_properties.for_widget(widget.type_id()),
+            stack,
+            class_set,
+        };
+        props.get::<Visible>(&mut state.property_cache).value
+    };
+
     // TODO - Handle damage regions
     // https://github.com/linebender/xilem/issues/789
 
-    if (state.request_pre_paint || state.request_paint || state.request_post_paint) && !is_stashed {
+    if (state.request_pre_paint || state.request_paint || state.request_post_paint)
+        && !is_stashed
+        && is_visible
+    {
         if trace {
             trace!("Painting widget '{}' {}", widget.short_type_name(), id);
         }
@@ -132,17 +145,6 @@ fn paint_widget(
         }
     }
 
-    {
-        let stack = property_arena.get(state.property_stack_id, widget.type_id());
-        let props = PropertiesRef {
-            local: properties,
-            default_map: default_properties.for_widget(widget.type_id()),
-            stack,
-            class_set,
-        };
-        visible &= props.get::<Visible>(&mut state.property_cache).value;
-    }
-
     state.request_pre_paint = false;
     state.request_paint = false;
     state.request_post_paint = false;
@@ -152,7 +154,7 @@ fn paint_widget(
     let content_box_to_layer_transform =
         border_box_to_layer_transform.pre_translate(state.border_box_translation());
     let has_clip = state.clip_path.is_some();
-    if !is_stashed && visible {
+    if !is_stashed && is_visible {
         let Some((pre_scene, scene, _)) = &mut scene_cache.get(&id) else {
             debug_panic!(
                 "Error in paint pass: scene should have been cached earlier in this function."
@@ -189,12 +191,12 @@ fn paint_widget(
             scene_cache,
             window_to_layer_transform,
             node.reborrow_mut(),
-            visible,
+            is_visible,
         );
         parent_state.merge_up(&mut node.item.state);
     });
 
-    if !is_stashed && visible {
+    if !is_stashed && is_visible {
         if global_state.debug_paint {
             // Draw the global axis aligned bounding rect of the widget
             const BORDER_WIDTH: f64 = 1.0;

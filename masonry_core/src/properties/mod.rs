@@ -41,6 +41,6 @@ pub(crate) fn core_property_changed(ctx: &mut UpdateCtx<'_>, property_type: Type
     } else if Background::matches(property_type) || BorderColor::matches(property_type) {
         ctx.request_pre_paint();
     } else if Visible::matches(property_type) {
-        ctx.widget_state.needs_paint = true;
+        ctx.request_render();
     }
 }
