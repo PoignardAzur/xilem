@@ -19,12 +19,10 @@ targets = []
 default = ["imaging_vello"]
 imaging_vello = ["dep:imaging_vello"]
 imaging_vello_hybrid = ["dep:imaging_vello_hybrid"]
-imaging_vello_cpu = ["dep:imaging_vello_cpu"]
 imaging_skia = ["dep:imaging_skia"]
 
 [dependencies]
 imaging.workspace = true
-imaging_vello_cpu = { workspace = true, optional = true }
 kurbo.workspace = true
 peniko.workspace = true
 

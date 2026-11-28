@@ -11,7 +11,7 @@
 //!
 //! - preparing flattened Masonry frame content from base content plus overlays
 //! - exposing backend-specific renderer modules for `imaging_vello`,
-//!   `imaging_vello_hybrid`, `imaging_vello_cpu`, and `imaging_skia`
+//!   `imaging_vello_hybrid`, and `imaging_skia`
 //! - exposing host-neutral texture rendering helpers for writing into caller-provided WGPU
 //!   targets
 //!
@@ -22,7 +22,6 @@
 //! - `default`: Enables the `vello` module.
 //! - `imaging_vello`: Enables the `vello` module and texture rendering support.
 //! - `imaging_vello_hybrid`: Enables the `vello_hybrid` module and texture rendering support.
-//! - `imaging_vello_cpu`: Enables the `vello_cpu` module for headless image rendering only.
 //! - `imaging_skia`: Enables the `skia` module and texture rendering support on non-wasm targets.
 
 // LINEBENDER LINT SET - lib.rs - v5
@@ -55,9 +54,6 @@ pub mod texture_render;
 /// Masonry helpers for rendering retained scenes with `imaging_vello`.
 #[cfg(all(not(target_arch = "wasm32"), feature = "imaging_vello"))]
 pub mod vello;
-/// Masonry helpers for rendering retained scenes with `imaging_vello_cpu`.
-#[cfg(feature = "imaging_vello_cpu")]
-pub mod vello_cpu;
 /// Masonry helpers for rendering retained scenes with `imaging_vello_hybrid`.
 #[cfg(all(not(target_arch = "wasm32"), feature = "imaging_vello_hybrid"))]
 pub mod vello_hybrid;
@@ -77,13 +73,6 @@ pub mod image_render {
     #[cfg(all(not(target_arch = "wasm32"), feature = "imaging_vello"))]
     pub use crate::vello::{BACKEND_NAME, Renderer, new_headless_renderer};
     #[cfg(all(
-        not(feature = "imaging_vello"),
-        not(feature = "imaging_skia"),
-        not(feature = "imaging_vello_hybrid"),
-        feature = "imaging_vello_cpu"
-    ))]
-    pub use crate::vello_cpu::{BACKEND_NAME, Renderer, new_headless_renderer};
-    #[cfg(all(
         not(target_arch = "wasm32"),
         not(feature = "imaging_vello"),
         not(feature = "imaging_skia"),
@@ -94,7 +83,6 @@ pub mod image_render {
     #[cfg(not(any(
         feature = "imaging_vello",
         feature = "imaging_vello_hybrid",
-        feature = "imaging_vello_cpu",
         all(feature = "imaging_skia", not(target_arch = "wasm32"))
     )))]
     pub use self::no_backend::{BACKEND_NAME, Error, Renderer, new_headless_renderer};
@@ -102,7 +90,6 @@ pub mod image_render {
     #[cfg(not(any(
         feature = "imaging_vello",
         feature = "imaging_vello_hybrid",
-        feature = "imaging_vello_cpu",
         all(feature = "imaging_skia", not(target_arch = "wasm32"))
     )))]
     mod no_backend {
