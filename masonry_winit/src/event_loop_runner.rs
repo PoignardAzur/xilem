@@ -9,34 +9,29 @@ use std::sync::{Arc, mpsc};
 use accesskit_winit::Adapter;
 use copypasta::nop_clipboard::NopClipboardContext;
 use copypasta::{ClipboardContext, ClipboardProvider};
-use masonry_core::app::{
-    RenderRoot, RenderRootOptions, RenderRootSignal, VisualLayerKind, WindowSizePolicy,
-};
+use masonry_core::app::{RenderRoot, RenderRootSignal, VisualLayerKind};
 use masonry_core::core::keyboard::{Key, KeyState};
-use masonry_core::core::{
-    DefaultProperties, ErasedAction, NewWidget, TextEvent, Widget, WindowEvent,
-};
-use masonry_core::peniko::Color;
+use masonry_core::core::{DefaultProperties, ErasedAction, TextEvent, WindowEvent};
 use masonry_core::util::Instant;
 use masonry_imaging::texture_render::{
     RenderTarget as ImagingRenderTarget, Renderer as ImagingRenderer,
 };
 use masonry_imaging::{Layer as ImagingLayer, PreparedFrame};
 use tracing::{info, info_span, trace};
-use ui_events_winit::{WindowEventReducer, WindowEventTranslation};
+use ui_events_winit::WindowEventTranslation;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::error::EventLoopError;
 use winit::event::{DeviceEvent as WinitDeviceEvent, DeviceId, WindowEvent as WinitWindowEvent};
 use winit::event_loop::{ActiveEventLoop, OwnedDisplayHandle};
-use winit::window::{Window as WindowHandle, WindowAttributes, WindowId as HandleId};
+use winit::window::{Window as WindowHandle, WindowId as HandleId};
 
 use crate::app::{
     AppDriver, DriverCtx, WgpuContext, WgpuLimits, masonry_resize_direction_to_winit,
     winit_ime_to_masonry,
 };
-use crate::app_driver::WindowId;
 use crate::vello_util::{RenderContext, RenderSurface};
+use crate::window::{NewWindow, Window, WindowId};
 
 /// The custom event type that we inject into winit's [`EventLoop`](winit::event_loop::EventLoop).
 ///
@@ -57,144 +52,6 @@ pub enum MasonryUserEvent {
 impl From<accesskit_winit::Event> for MasonryUserEvent {
     fn from(event: accesskit_winit::Event) -> Self {
         Self::AccessKit(event.window_id, event.window_event)
-    }
-}
-
-/// A container for a window yet to be created.
-///
-/// This is stored inside [`MasonryState`] and will be created during the `resumed` event.
-#[derive(Debug)]
-pub struct NewWindow {
-    /// The id is set by the App, and can be created using the [`WindowId::next()`] method.
-    ///
-    /// Once the window is created, it can be accessed using this `id` through the
-    /// [`DriverCtx::window()`] method.
-    pub id: WindowId,
-    /// Window attributes for the winit's [`Window`].
-    ///
-    /// A default attribute can be created using [`Window::default_attributes()`].
-    ///
-    /// [`Window`]: crate::winit::window::Window
-    /// [`Window::default_attributes()`]: crate::winit::window::Window::default_attributes()
-    pub attributes: WindowAttributes,
-    /// The widget which will take up the entire contents of the new window.
-    pub root_widget: NewWidget<dyn Widget>,
-    /// The base color of the window.
-    pub base_color: Color,
-}
-
-impl NewWindow {
-    /// Creates a new window with an automatically assigned [`WindowId`].
-    ///
-    /// See the documentation on the fields of this type for details of the parameters.
-    pub fn new(attributes: WindowAttributes, root_widget: NewWidget<dyn Widget + 'static>) -> Self {
-        Self::new_with_id(WindowId::next(), attributes, root_widget)
-    }
-
-    /// Creates a new window with a custom assigned [`WindowId`].
-    ///
-    /// Use this when you need to specify a unique ID for the window, for example,
-    /// for external tracking or state management.
-    ///
-    /// Every window you create should have a unique id.
-    /// You should never recycle ids from previous windows, even after deleting them.
-    pub fn new_with_id(
-        id: WindowId,
-        attributes: WindowAttributes,
-        root_widget: NewWidget<dyn Widget + 'static>,
-    ) -> Self {
-        Self {
-            id,
-            attributes,
-            root_widget,
-            base_color: Color::BLACK,
-        }
-    }
-
-    /// Sets the base color of the new window.
-    ///
-    /// The base color is the color of the background which all widgets in the window draw on top of.
-    /// Masonry's current default theme assumes that this will be a very dark color for sufficient contrast.
-    /// This is most useful for apps which want to for example support light mode.
-    ///
-    /// Please note that it is not currently supported to modify this once the app is running.
-    /// This is not a fundamental limitation, and is only due to missing api design.
-    pub fn with_base_color(mut self, base_color: Color) -> Self {
-        self.base_color = base_color;
-        self
-    }
-}
-
-/// Per-Window state
-pub struct Window {
-    id: WindowId,
-    pub(crate) handle: Arc<WindowHandle>,
-    pub(crate) accesskit_adapter: Adapter,
-    event_reducer: WindowEventReducer,
-    pub(crate) render_root: RenderRoot,
-    pub(crate) base_color: Color,
-}
-
-impl Window {
-    pub(crate) fn new(
-        window_id: WindowId,
-        handle: Arc<WindowHandle>,
-        accesskit_adapter: Adapter,
-        root_widget: NewWidget<dyn Widget>,
-        signal_sender: Sender<(WindowId, RenderRootSignal)>,
-        default_properties: Arc<DefaultProperties>,
-        base_color: Color,
-        size: PhysicalSize<u32>,
-        scale_factor: f64,
-    ) -> Self {
-        Self {
-            id: window_id,
-            handle,
-            accesskit_adapter,
-            event_reducer: WindowEventReducer::default(),
-            render_root: RenderRoot::new(
-                root_widget,
-                move |signal| {
-                    signal_sender.clone().send((window_id, signal)).unwrap();
-                },
-                RenderRootOptions {
-                    default_properties,
-                    use_system_fonts: true,
-                    size_policy: WindowSizePolicy::User,
-                    size,
-                    scale_factor,
-                    test_font: None,
-                },
-            ),
-            base_color,
-        }
-    }
-
-    /// Access the underlying [Winit window](WindowHandle) of this window.
-    pub fn handle(&self) -> &winit::window::Window {
-        &self.handle
-    }
-
-    /// Access the [`RenderRoot`] of this window.
-    pub fn render_root(&mut self) -> &mut RenderRoot {
-        &mut self.render_root
-    }
-
-    /// Access base color of this window.
-    pub fn base_color(&mut self) -> &mut Color {
-        &mut self.base_color
-    }
-}
-
-impl Debug for Window {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Window")
-            .field("id", &self.id)
-            .field("handle", &self.handle)
-            .field("event_reducer", &self.event_reducer)
-            .field("render_root", &self.render_root)
-            .field("base_color", &self.base_color)
-            .finish_non_exhaustive()
     }
 }
 

@@ -2,40 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::fmt::Debug;
-use std::hash::Hash;
-use std::num::NonZeroU64;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use masonry_core::app::RenderRoot;
 use masonry_core::core::{ErasedAction, WidgetId};
-use tracing::field::DisplayValue;
 use winit::event_loop::ActiveEventLoop;
 
 use crate::app::MasonryState;
-use crate::event_loop_runner::{NewWindow, Window};
-
-/// A unique and persistent identifier for a window.
-///
-/// [`MasonryState`] internally maps these to winit window ids ([`winit::window::WindowId`]).
-/// Applications should only use this struct and not be concerned with the winit window ids.
-/// When the application is suspended and resumed this id will stay the same, while the
-/// winit window id will change.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct WindowId(pub(crate) NonZeroU64);
-
-impl WindowId {
-    /// Allocate a new, unique `WindowId`.
-    pub fn next() -> Self {
-        static WINDOW_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
-        let id = WINDOW_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-        Self(id.try_into().unwrap())
-    }
-
-    /// A serialized representation of the `WindowId` for debugging purposes.
-    pub fn trace(self) -> DisplayValue<NonZeroU64> {
-        tracing::field::display(self.0)
-    }
-}
+use crate::window::{NewWindow, Window, WindowId};
 
 /// Context for the [`AppDriver`] trait.
 #[derive(Debug)]

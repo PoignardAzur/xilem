@@ -87,16 +87,17 @@ mod app_driver;
 mod convert_winit_event;
 mod event_loop_runner;
 mod vello_util;
+mod window;
 
 pub use winit;
 
 /// Types needed for running a Masonry app.
 pub mod app {
-    pub use super::app_driver::{AppDriver, DriverCtx, WgpuContext, WgpuLimits, WindowId};
+    pub use super::app_driver::{AppDriver, DriverCtx, WgpuContext, WgpuLimits};
     pub use super::event_loop_runner::{
-        EventLoop, EventLoopBuilder, EventLoopProxy, MasonryState, MasonryUserEvent, NewWindow,
-        Window, run, run_with,
+        EventLoop, EventLoopBuilder, EventLoopProxy, MasonryState, MasonryUserEvent, run, run_with,
     };
+    pub use super::window::{NewWindow, Window, WindowId};
 
     pub(crate) use super::convert_winit_event::{
         masonry_resize_direction_to_winit, winit_ime_to_masonry,
