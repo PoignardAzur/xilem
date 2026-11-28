@@ -5,7 +5,9 @@ use std::{any::TypeId, collections::HashSet};
 
 use kurbo::Affine;
 
-use crate::core::{PropertySet, PropertyStackId, Widget, WidgetId, WidgetTag, WidgetTagInner};
+use crate::core::{
+    PropertySet, PropertyStackId, SubwindowId, Widget, WidgetId, WidgetTag, WidgetTagInner,
+};
 
 /// A container for one widget in the hierarchy.
 ///
@@ -30,6 +32,7 @@ pub struct NewWidget<W: ?Sized> {
     /// The widget we're going to add.
     pub widget: Box<W>,
     pub(crate) id: WidgetId,
+    pub(crate) subwindow_id: Option<SubwindowId>,
     pub(crate) action_type: TypeId,
     #[cfg(debug_assertions)]
     pub(crate) action_type_name: &'static str,
@@ -109,6 +112,7 @@ impl<W: Widget> NewWidget<W> {
         Self {
             widget: Box::new(inner),
             id: WidgetId::next(),
+            subwindow_id: None,
             action_type: TypeId::of::<W::Action>(),
             #[cfg(debug_assertions)]
             action_type_name: std::any::type_name::<W::Action>(),
@@ -127,6 +131,7 @@ impl<W: Widget + ?Sized> NewWidget<W> {
     pub fn erased(self) -> NewWidget<dyn Widget> {
         NewWidget {
             widget: self.widget.as_box_dyn(),
+            subwindow_id: self.subwindow_id,
             id: self.id,
             action_type: self.action_type,
             #[cfg(debug_assertions)]

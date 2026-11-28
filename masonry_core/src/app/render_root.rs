@@ -20,9 +20,9 @@ use crate::app::subwindow_stack::SubwindowStack;
 use crate::core::{
     AccessCtx, AccessEvent, BrushIndex, CursorIcon, DefaultProperties, ErasedAction, FromDynWidget,
     Handled, Ime, NewWidget, PointerEvent, PropertiesRef, PropertyArena, PropertyStack,
-    PropertyStackId, QueryCtx, ResizeDirection, SubwindowType, TextEvent, Widget, WidgetArena,
-    WidgetArenaNode, WidgetId, WidgetMut, WidgetPod, WidgetRef, WidgetState, WidgetTag,
-    WidgetTagInner, WindowEvent,
+    PropertyStackId, QueryCtx, ResizeDirection, SubwindowId, SubwindowType, TextEvent, Widget,
+    WidgetArena, WidgetArenaNode, WidgetId, WidgetMut, WidgetPod, WidgetRef, WidgetState,
+    WidgetTag, WidgetTagInner, WindowEvent,
 };
 use crate::imaging::record::Scene;
 use crate::passes::accessibility::run_accessibility_pass;
@@ -153,12 +153,10 @@ pub(crate) struct RenderRootState {
     pub(crate) widget_tags: HashMap<WidgetTagInner, WidgetId>,
 
     /// Map of subwindows attached to widgets, keyed by the attached widget id, then the type of the subwindow root.
-    // FIXME - Add SubwindowId type and use that instead.
-    pub(crate) attached_subwindows: HashMap<WidgetId, HashMap<TypeId, WidgetId>>,
+    pub(crate) attached_subwindows: HashMap<WidgetId, HashMap<TypeId, SubwindowId>>,
 
-    /// Map of widgets with subwindows attached, keyed by the subwindow root id.
-    // FIXME - Add SubwindowId type and use that instead.
-    pub(crate) attached_subwindows_rev: HashMap<WidgetId, (TypeId, WidgetId)>,
+    /// Map of widgets with subwindows attached, keyed by the subwindow id.
+    pub(crate) attached_subwindows_rev: HashMap<SubwindowId, (TypeId, WidgetId)>,
 
     /// Whether data set in the pointer pass has been invalidated.
     pub(crate) needs_pointer_pass: bool,
@@ -290,13 +288,13 @@ pub enum RenderRootSignal {
     /// The given [`Point`] must be in the window's coordinate space.
     ///
     /// [subwindow]: crate::doc::masonry_concepts#subwindows
-    NewSubwindow(SubwindowType, NewWidget<dyn Widget>, Point),
-    /// The subwindow with the given widget as root should be removed.
-    RemoveSubwindow(WidgetId),
-    /// The subwindow with the given widget as root should be repositioned to the specified point.
+    NewSubwindow(SubwindowId, SubwindowType, NewWidget<dyn Widget>, Point),
+    /// The subwindow with the given id should be removed.
+    RemoveSubwindow(SubwindowId),
+    /// The subwindow with the given id should be repositioned to the specified point.
     ///
-    /// The given [`Point`] must be in the window's coordinate space.
-    RepositionSubwindow(WidgetId, Point),
+    /// The given [`Point`] must be in the parent window's coordinate space.
+    RepositionSubwindow(SubwindowId, Point),
 }
 
 /// State of the widget inspector. Useful for debugging.
@@ -712,6 +710,7 @@ impl RenderRoot {
         res
     }
 
+    // TODO - Use SubwindowId?
     /// Returns a [`WidgetMut`] to the root widget of the given [subwindow](crate::doc::masonry_concepts#subwindows).
     ///
     /// Because of how `WidgetMut` works, it can only be passed to a user-provided callback.
@@ -779,17 +778,23 @@ impl RenderRoot {
     /// Adds a new subwindow at the end of the stack, with the given widget as its root, at the given position.
     ///
     /// The given `pos` must be in the window's coordinate space.
-    pub fn add_subwindow(&mut self, root: NewWidget<impl Widget + ?Sized>, pos: Point) {
+    pub fn add_subwindow(
+        &mut self,
+        id: SubwindowId,
+        root: NewWidget<impl Widget + ?Sized>,
+        pos: Point,
+    ) -> SubwindowId {
         debug!("added subwindow to stack");
-        mutate_widget(self, self.root_id(), |mut subwindow_stack| {
+        let id = mutate_widget(self, self.root_id(), |mut subwindow_stack| {
             let mut subwindow_stack = subwindow_stack.downcast::<SubwindowStack>();
-            SubwindowStack::add_subwindow(&mut subwindow_stack, root, pos);
+            SubwindowStack::add_subwindow(&mut subwindow_stack, id, root, pos)
         });
 
         self.run_rewrite_passes();
+        id
     }
 
-    /// Removes the subwindow with the given widget as root.
+    /// Removes the subwindow with the given id.
     ///
     /// The main subwindow cannot be removed.
     ///
@@ -797,16 +802,16 @@ impl RenderRoot {
     ///
     /// Panics in debug mode if the intended subwindow is the main subwindow or
     /// is not found.
-    pub fn remove_subwindow(&mut self, root_id: WidgetId) {
+    pub fn remove_subwindow(&mut self, id: SubwindowId) {
         mutate_widget(self, self.root_id(), |mut subwindow_stack| {
             let mut subwindow_stack = subwindow_stack.downcast::<SubwindowStack>();
-            SubwindowStack::remove_subwindow(&mut subwindow_stack, root_id);
+            SubwindowStack::remove_subwindow(&mut subwindow_stack, id);
         });
 
         self.run_rewrite_passes();
     }
 
-    /// Repositions the subwindow with the given widget as root.
+    /// Repositions the subwindow with the given id.
     ///
     /// The given `new_origin` must be in the window's coordinate space.
     ///
@@ -816,10 +821,10 @@ impl RenderRoot {
     ///
     /// Panics in debug mode if the intended subwindow is the main subwindow or
     /// is not found.
-    pub fn reposition_subwindow(&mut self, root_id: WidgetId, new_origin: Point) {
+    pub fn reposition_subwindow(&mut self, id: SubwindowId, new_origin: Point) {
         mutate_widget(self, self.root_id(), |mut subwindow_stack| {
             let mut subwindow_stack = subwindow_stack.downcast::<SubwindowStack>();
-            SubwindowStack::reposition_subwindow(&mut subwindow_stack, root_id, new_origin);
+            SubwindowStack::reposition_subwindow(&mut subwindow_stack, id, new_origin);
         });
 
         self.run_rewrite_passes();
@@ -1150,14 +1155,13 @@ impl RenderRootState {
     }
 
     /// Emit a `RemoveSubwindow` signal and perform related cleanups.
-    // FIXME - Add SubwindowId type and use that instead.
-    pub(crate) fn remove_subwindow(&mut self, subwindow_id: WidgetId) {
-        if let Some((type_id, widget_id)) = self.attached_subwindows_rev.remove(&subwindow_id)
+    pub(crate) fn remove_subwindow(&mut self, id: SubwindowId) {
+        if let Some((type_id, widget_id)) = self.attached_subwindows_rev.remove(&id)
             && let Some(map) = self.attached_subwindows.get_mut(&widget_id)
         {
             let _ = map.remove(&type_id);
         }
-        self.emit_signal(RenderRootSignal::RemoveSubwindow(subwindow_id));
+        self.emit_signal(RenderRootSignal::RemoveSubwindow(id));
     }
 
     /// Does something in this state indicate that the rewrite passes need to be reran.

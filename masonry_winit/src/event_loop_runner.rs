@@ -1142,14 +1142,14 @@ impl MasonryState {
                     };
                     info!("Widget selected in inspector: {widget_id} - {display_name}");
                 }
-                RenderRootSignal::NewSubwindow(_type, root, pos) => {
-                    window.render_root.add_subwindow(root, pos);
+                RenderRootSignal::NewSubwindow(id, _type, root, pos) => {
+                    window.render_root.add_subwindow(id, root, pos);
                 }
-                RenderRootSignal::RemoveSubwindow(root_id) => {
-                    window.render_root.remove_subwindow(root_id);
+                RenderRootSignal::RemoveSubwindow(id) => {
+                    window.render_root.remove_subwindow(id);
                 }
-                RenderRootSignal::RepositionSubwindow(root_id, new_pos) => {
-                    window.render_root.reposition_subwindow(root_id, new_pos);
+                RenderRootSignal::RepositionSubwindow(id, new_pos) => {
+                    window.render_root.reposition_subwindow(id, new_pos);
                 }
             }
         }

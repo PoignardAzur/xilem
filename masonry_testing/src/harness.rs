@@ -511,8 +511,8 @@ impl<W: Widget> TestHarness<W> {
                 RenderRootSignal::Exit => (),
                 RenderRootSignal::ShowWindowMenu(_) => (),
                 RenderRootSignal::WidgetSelectedInInspector(_) => (),
-                RenderRootSignal::NewSubwindow(_type, root, pos) => {
-                    self.render_root.add_subwindow(root, pos);
+                RenderRootSignal::NewSubwindow(id, _type, root, pos) => {
+                    self.render_root.add_subwindow(id, root, pos);
                 }
                 RenderRootSignal::RemoveSubwindow(root_id) => {
                     self.render_root.remove_subwindow(root_id);

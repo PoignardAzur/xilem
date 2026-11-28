@@ -7,7 +7,8 @@ use kurbo::{Affine, Insets, Point, Rect, Size, Vec2};
 use tracing::Span;
 
 use crate::core::{
-    ClassSetDiff, PaintLayerMode, PropertyCache, PropertyStackId, WidgetId, WidgetOptions,
+    ClassSetDiff, PaintLayerMode, PropertyCache, PropertyStackId, SubwindowId, WidgetId,
+    WidgetOptions,
 };
 use crate::layout::MeasurementCache;
 
@@ -70,6 +71,8 @@ use crate::layout::MeasurementCache;
 #[derive(Clone, Debug)]
 pub(crate) struct WidgetState {
     pub(crate) id: WidgetId,
+    /// `None` if this widget isn't the root of a subwindow.
+    pub(crate) subwindow_id: Option<SubwindowId>,
 
     // --- LAYOUT ---
     /// The origin (top-left) of the widget's aligned border-box
@@ -284,6 +287,7 @@ pub(crate) struct WidgetState {
 impl WidgetState {
     pub(crate) fn new(
         id: WidgetId,
+        subwindow_id: Option<SubwindowId>,
         widget_name: &'static str,
         options: WidgetOptions,
         action_type: TypeId,
@@ -292,6 +296,7 @@ impl WidgetState {
     ) -> Self {
         Self {
             id,
+            subwindow_id,
 
             origin: Point::ORIGIN,
             end_point: Point::ORIGIN,

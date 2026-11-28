@@ -9,7 +9,7 @@ use tracing::{Span, trace_span};
 
 use crate::core::{
     AccessCtx, ChildrenIds, LayoutCtx, MeasureCtx, NewWidget, NoAction, PaintCtx, PropertiesRef,
-    RegisterCtx, UpdateCtx, Widget, WidgetId, WidgetMut, WidgetPod,
+    RegisterCtx, SubwindowId, UpdateCtx, Widget, WidgetId, WidgetMut, WidgetPod,
 };
 use crate::imaging::Painter;
 use crate::layout::{LenReq, Length, SizeDef};
@@ -37,6 +37,8 @@ pub(crate) struct SubwindowStack {
 ///
 /// This is widget ownership state, not a derived visual/render subwindow.
 struct SubwindowEntry {
+    /// Id of the subwindow
+    id: SubwindowId,
     /// Root widget owned by this top-level subwindow entry.
     root: WidgetPod<dyn Widget>,
     /// Position of this subwindow entry in the `SubwindowStack`'s content-box coordinates.
@@ -47,7 +49,10 @@ struct SubwindowEntry {
 impl SubwindowStack {
     /// Creates a stack with the provided main subwindow.
     pub(crate) fn new(root: NewWidget<impl Widget + ?Sized>) -> Self {
+        // TODO - Return this?
+        let main_subwindow_id = SubwindowId::next();
         let subwindow = SubwindowEntry {
+            id: main_subwindow_id,
             root: root.erased().to_pod(),
             position: Point::ZERO,
         };
@@ -80,15 +85,22 @@ impl SubwindowStack {
     /// then that coordinate space will exactly match the window's coordinate space.
     pub(crate) fn add_subwindow(
         this: &mut WidgetMut<'_, Self>,
+        id: SubwindowId,
         root: NewWidget<impl Widget + ?Sized>,
         position: Point,
-    ) {
+    ) -> SubwindowId {
+        let root = NewWidget {
+            subwindow_id: Some(id),
+            ..root
+        };
         let subwindow = SubwindowEntry {
+            id,
             root: root.erased().to_pod(),
             position,
         };
         this.widget.subwindows.push(subwindow);
         this.ctx.children_changed();
+        id
     }
 
     /// Returns a mutable reference to the root widget of the subwindow at `idx`.
@@ -105,7 +117,7 @@ impl SubwindowStack {
         this.ctx.get_mut(subwindow)
     }
 
-    /// Removes the subwindow with the given widget as root.
+    /// Removes the subwindow with the given id.
     ///
     /// The main subwindow cannot be removed.
     ///
@@ -113,15 +125,11 @@ impl SubwindowStack {
     ///
     /// Panics in debug mode if the intended subwindow is the main subwindow or
     /// is not found.
-    pub(crate) fn remove_subwindow(this: &mut WidgetMut<'_, Self>, root_id: WidgetId) {
-        match this
-            .widget
-            .subwindows
-            .iter()
-            .position(|subwindow| subwindow.root.id() == root_id)
-        {
+    pub(crate) fn remove_subwindow(this: &mut WidgetMut<'_, Self>, id: SubwindowId) {
+        let idx = this.widget.subwindows.iter().position(|subw| subw.id == id);
+        match idx {
             Some(0) => debug_panic!("Cannot remove main subwindow"),
-            None => debug_panic!("subwindow with root widget {root_id:?} not found"),
+            None => debug_panic!("subwindow with root widget {id:?} not found"),
             Some(idx) => {
                 let child = this.widget.subwindows.remove(idx).root;
                 this.ctx.remove_child(child);
@@ -129,7 +137,7 @@ impl SubwindowStack {
         }
     }
 
-    /// Repositions the subwindow with the given widget as root.
+    /// Repositions the subwindow with the given id.
     ///
     /// The given `new_origin` must be in this `SubwindowStack`'s content-box coordinate space.
     /// If this `SubwindowStack` is used as the root widget with no borders, padding, or transforms,
@@ -143,17 +151,13 @@ impl SubwindowStack {
     /// is not found.
     pub(crate) fn reposition_subwindow(
         this: &mut WidgetMut<'_, Self>,
-        root_id: WidgetId,
+        id: SubwindowId,
         new_origin: Point,
     ) {
-        match this
-            .widget
-            .subwindows
-            .iter()
-            .position(|subwindow| subwindow.root.id() == root_id)
-        {
+        let idx = this.widget.subwindows.iter().position(|subw| subw.id == id);
+        match idx {
             Some(0) => debug_panic!("Cannot reposition main subwindow"),
-            None => debug_panic!("subwindow with root widget {root_id:?} not found"),
+            None => debug_panic!("subwindow with root widget {id:?} not found"),
             Some(idx) => {
                 this.widget.subwindows[idx].position = new_origin;
                 this.ctx.request_layout();

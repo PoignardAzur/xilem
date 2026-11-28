@@ -152,7 +152,7 @@ impl Widget for SelectorMenu {
                 button: None | Some(PointerButton::Primary),
                 ..
             }) => {
-                let self_id = ctx.widget_id();
+                let self_id = ctx.subwindow_id().unwrap();
 
                 // Note: this only works because all children are expected to be
                 // SelectorItem, whose only possible child is a Label.
@@ -195,7 +195,7 @@ impl Widget for SelectorMenu {
     ) {
         match event {
             TextEvent::WindowFocusChange(false) => {
-                ctx.remove_subwindow(ctx.widget_id());
+                ctx.remove_subwindow(ctx.subwindow_id().unwrap());
             }
             _ => (),
         }
@@ -366,7 +366,7 @@ impl Subwindow for SelectorMenu {
         };
 
         if remove_this {
-            ctx.remove_subwindow(ctx.widget_id());
+            ctx.remove_subwindow(ctx.subwindow_id().unwrap());
         }
     }
 }

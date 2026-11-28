@@ -22,7 +22,8 @@ use crate::app::{MutateCallback, RenderRootSignal, RenderRootState};
 use crate::core::{
     AllowRawMut, BrushIndex, ClassSet, ErasedAction, FromDynWidget, NewWidget, PaintLayerMode,
     PropertiesMut, PropertiesRef, PropertyArena, PropertyCache, PropertyStackId, ResizeDirection,
-    SubwindowType, Widget, WidgetArenaNode, WidgetId, WidgetMut, WidgetPod, WidgetRef, WidgetState,
+    SubwindowId, SubwindowType, Widget, WidgetArenaNode, WidgetId, WidgetMut, WidgetPod, WidgetRef,
+    WidgetState,
 };
 use crate::kurbo::{Affine, Axis, Insets, Point, Rect, Size, Vec2};
 use crate::layout::{LayoutSize, LenDef, Length, SizeDef};
@@ -181,6 +182,13 @@ impl_context_method!(
         /// The `WidgetId` of the current widget.
         pub fn widget_id(&self) -> WidgetId {
             self.widget_state.id
+        }
+
+        /// The `SubwindowId` of the current subwindow.
+        ///
+        /// Returns `None` if this widget isn't the root of a subwindow.
+        pub fn subwindow_id(&self) -> Option<SubwindowId> {
+            self.widget_state.subwindow_id
         }
 
         #[allow(dead_code, reason = "Copy-pasted for some types that don't need it")]
@@ -1956,7 +1964,7 @@ impl_context_method!(
             subwindow_type: SubwindowType,
             mut fallback_widget: NewWidget<W>,
             position: Point,
-        ) {
+        ) -> SubwindowId {
             trace!("create_subwindow");
 
             if fallback_widget.widget.as_subwindow().is_none() {
@@ -1964,15 +1972,18 @@ impl_context_method!(
                     "cannot create subwindow of type {} - `Widget::as_subwindow()` returned None",
                     fallback_widget.widget.short_type_name()
                 );
-                return;
+                return SubwindowId::next();
             }
 
+            let subwindow_id = SubwindowId::next();
             self.global_state
                 .emit_signal(RenderRootSignal::NewSubwindow(
+                    subwindow_id,
                     subwindow_type,
                     fallback_widget.erased(),
                     position,
                 ));
+            subwindow_id
         }
 
         /// Creates a new [subwindow] at a specified `position`, and ties it to the current widget.
@@ -1993,7 +2004,7 @@ impl_context_method!(
             subwindow_type: SubwindowType,
             mut fallback_widget: NewWidget<W>,
             position: Point,
-        ) {
+        ) -> SubwindowId {
             trace!("create_attached_subwindow");
 
             if fallback_widget.widget.as_subwindow().is_none() {
@@ -2001,13 +2012,12 @@ impl_context_method!(
                     "cannot create subwindow of type {} - `Widget::as_subwindow()` returned None",
                     fallback_widget.widget.short_type_name()
                 );
-                return;
+                return SubwindowId::next();
             }
 
             let self_id = self.widget_id();
             let type_id = TypeId::of::<W>();
-            // FIXME - Add SubwindowId type and use that instead.
-            let subwindow_id = fallback_widget.id;
+            let subwindow_id = SubwindowId::next();
 
             let subwindows = self
                 .global_state
@@ -2019,6 +2029,7 @@ impl_context_method!(
             }
             self.global_state
                 .emit_signal(RenderRootSignal::NewSubwindow(
+                    subwindow_id,
                     subwindow_type,
                     fallback_widget.erased(),
                     position,
@@ -2026,12 +2037,14 @@ impl_context_method!(
             self.global_state
                 .attached_subwindows_rev
                 .insert(subwindow_id, (type_id, self_id));
+
+            subwindow_id
         }
 
         /// Returns the attached subwindow created by this widget with the given type `W`.
         ///
         /// See [`Self::create_attached_subwindow`] for more details.
-        pub fn get_attached_subwindow<W: Widget + ?Sized>(&self) -> Option<WidgetId> {
+        pub fn get_attached_subwindow<W: Widget + ?Sized>(&self) -> Option<SubwindowId> {
             self.global_state
                 .attached_subwindows
                 .get(&self.widget_id())?
@@ -2040,21 +2053,18 @@ impl_context_method!(
         }
 
         /// Removes the subwindow with the specified widget as root.
-        pub fn remove_subwindow(&mut self, subwindow_root: WidgetId) {
+        pub fn remove_subwindow(&mut self, id: SubwindowId) {
             trace!("remove_subwindow");
-            self.global_state.remove_subwindow(subwindow_root);
+            self.global_state.remove_subwindow(id);
         }
 
         /// Repositions the subwindow with the specified widget as root.
         ///
         /// The given `position` must be in the window's coordinate space.
-        pub fn reposition_subwindow(&mut self, root_widget_id: WidgetId, position: Point) {
+        pub fn reposition_subwindow(&mut self, id: SubwindowId, position: Point) {
             trace!("reposition_subwindow");
             self.global_state
-                .emit_signal(RenderRootSignal::RepositionSubwindow(
-                    root_widget_id,
-                    position,
-                ));
+                .emit_signal(RenderRootSignal::RepositionSubwindow(id, position));
         }
     }
 );
@@ -2085,6 +2095,7 @@ impl RegisterCtx<'_> {
     pub fn register_child(&mut self, child: &mut WidgetPod<impl Widget + ?Sized>) {
         let Some(NewWidget {
             widget,
+            subwindow_id,
             id,
             options,
             properties,
@@ -2106,6 +2117,7 @@ impl RegisterCtx<'_> {
 
         let state = WidgetState::new(
             id,
+            subwindow_id,
             widget.short_type_name(),
             options,
             action_type,

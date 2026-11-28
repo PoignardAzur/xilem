@@ -172,7 +172,7 @@ impl Subwindow for Tooltip {
         );
 
         if remove_tooltip {
-            ctx.remove_subwindow(ctx.widget_id());
+            ctx.remove_subwindow(ctx.subwindow_id().unwrap());
         }
     }
 }

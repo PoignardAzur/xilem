@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use masonry::app::RenderRoot;
-use masonry::core::{ErasedAction, Handled, NewWidget, StyleProperty, Widget, WidgetId, WidgetTag};
+use masonry::core::{
+    ErasedAction, Handled, NewWidget, StyleProperty, SubwindowId, Widget, WidgetId, WidgetTag,
+};
 use masonry::kurbo::Point;
 use masonry::properties::types::CrossAxisAlignment;
 use masonry::subwindows::Tooltip;
@@ -69,7 +71,8 @@ impl DemoPage for TooltipDemo {
                 .with_style(StyleProperty::FontSize(14.0))
                 .prepare(),
         ));
-        render_root.add_subwindow(tooltip.erased(), Point::new(320.0, 120.0));
+        let subwindow_id = SubwindowId::next();
+        render_root.add_subwindow(subwindow_id, tooltip.erased(), Point::new(320.0, 120.0));
         Handled::Yes
     }
 }
