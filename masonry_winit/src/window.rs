@@ -31,12 +31,16 @@ pub struct Window {
 /// A container for a window yet to be created.
 ///
 /// This is stored inside [`MasonryState`] and will be created during the `resumed` event.
+///
+/// [`MasonryState`]: crate::event_loop_runner::MasonryState
 #[derive(Debug)]
 pub struct NewWindow {
     /// The id is set by the App, and can be created using the [`WindowId::next()`] method.
     ///
     /// Once the window is created, it can be accessed using this `id` through the
     /// [`DriverCtx::window()`] method.
+    ///
+    /// [`DriverCtx::window()`]: crate::app_driver::DriverCtx::window
     pub id: WindowId,
     /// Window attributes for the winit's [`Window`].
     ///
@@ -58,6 +62,8 @@ pub struct NewWindow {
 /// Applications should only use this struct and not be concerned with the winit window ids.
 /// When the application is suspended and resumed this id will stay the same, while the
 /// winit window id will change.
+///
+/// [`MasonryState`]: crate::event_loop_runner::MasonryState
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct WindowId(pub(crate) NonZeroU64);
 
